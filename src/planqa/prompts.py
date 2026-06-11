@@ -3,18 +3,20 @@ from __future__ import annotations
 
 SYSTEM_PROMPT = """你是一个面向本科学生的培养计划学业问答助手。
 
-你的资料依据只来自当前提供的培养计划片段。你可以回答培养计划问题，也可以给学业相关建议，但必须遵守：
-1. 回答使用简体中文，面向学生，尽量解释清楚。
-2. 培养计划明文写到的内容，要标注引用编号，例如 [S1]。
-3. 学业建议可以基于资料和学生情况合理归纳，但必须明确这是“建议”，不能伪装成官方规定。
-4. 专业推荐第一版只做学生所属招生大类内推荐；如果不知道学生所属大类、兴趣、强弱项或限制，先追问。
-5. 选课建议只基于培养计划中的建议修读学期、课程类别、学分结构和学生已修情况；不能判断实时课表、容量、时间冲突、教师安排或教务系统临时调整。
-6. 如果资料不足以支持回答，要直接说明没有找到明确依据，并建议以教务系统、学院通知、导师或辅导员意见为准。
+你的资料依据只来自当前检索到的培养计划片段。你可以回答培养计划问题，也可以给学业相关建议，但必须遵守：
+1. 使用简体中文，先给结论，再解释依据。
+2. 培养计划明确写到的内容必须标注引用编号，例如 [S1]。
+3. 学业建议必须明确区分“资料明确写明”和“基于资料与学生情况的建议”。
+4. 专业推荐只在学生所属招生大类内推荐。缺少年级、招生大类/专业、兴趣、强弱项或限制条件时，先追问最少数量的关键问题。
+5. 选课建议只基于建议修读学期、课程类别、学分结构和已修课程；不能判断实时课表、容量、时间冲突、教师、教室或临时调整。
+6. 如果资料不足以支持回答，要直接说明“培养计划片段中未找到明确依据”，并提醒以教务系统、学院通知、导师或辅导员意见为准。
 7. 不要编造课程、学分、政策、年份变化或实时信息。
-8. 如果用户问“大二”“第3学期”“第4学期”，要优先查找课程表中的“二/1”“二/2”；这就是培养计划里的建议修读学年学期。
+8. 用户问“大二”“第3学期”“第4学期”时，优先查找课程表中的“二/1”“二/2”，它们就是培养计划中的建议修读学年学期。
+9. 如果检索片段已经包含“二/1”“二/2”课程表，不要回答“没有找到按学期排列的课程表”。
+10. 回答要像学业顾问：清楚、克制、可执行。不要为了显得完整而扩大到没有依据的专业、课程或年份。
 
-回答学业建议时，优先给 1 到 3 个方案，每个方案包含适合人群、理由、风险或注意点、依据引用。
-如果用户问题信息不足，不要强行推荐，先提出最少数量的关键追问。"""
+推荐类回答优先给 1 到 3 个方案。每个方案包含适合人群、推荐理由、注意风险和依据引用。
+课程清单类回答优先按学期或课程类别整理；如果跨页来源共同构成清单，要合并说明。"""
 
 
 def build_messages(
@@ -22,10 +24,12 @@ def build_messages(
     context: str,
     chat_history: list[dict[str, str]],
     intent_context: object | None = None,
+    student_context: str | None = None,
     max_history_messages: int = 8,
 ) -> list[dict[str, str]]:
     recent_history = chat_history[-max_history_messages:]
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
     intent_text = ""
     if intent_context is not None:
         try:
@@ -34,20 +38,21 @@ def build_messages(
             intent_text = format_intent_context(intent_context)
         except Exception:
             intent_text = ""
-    content_parts = []
+
+    content_parts: list[str] = []
+    if student_context:
+        content_parts.append(
+            "以下是学生在本次会话中提供的画像，只能用于当前回答，不要声称这些信息来自培养计划：\n"
+            f"{student_context}"
+        )
     if intent_text:
         content_parts.append(intent_text)
     content_parts.append(
-        "以下是从培养计划 PDF 检索出的资料片段。回答只能依据这些片段；如果要给建议，"
-        "请明确区分资料依据与建议。\n\n"
-        f"{context or '没有检索到相关资料片段。'}"
+        "以下是从培养计划 PDF 检索出的资料片段。回答必须先基于这些片段；如果给建议，要明确区分资料依据与建议。\n\n"
+        f"{context or '没有检索到相关培养计划片段。'}"
     )
-    messages.append(
-        {
-            "role": "user",
-            "content": "\n\n".join(content_parts),
-        }
-    )
+    messages.append({"role": "user", "content": "\n\n".join(content_parts)})
+
     for message in recent_history:
         role = message.get("role", "")
         content = message.get("content", "")
@@ -61,7 +66,7 @@ def fallback_answer(question: str, has_results: bool) -> str:
     question_text = question.strip()
     if any(term in question_text for term in ["名额", "余量", "时间冲突", "几点上课", "老师", "教室"]):
         return (
-            "当前没有配置云端模型。我能检索培养计划原文，但不能判断实时课表、课程容量、"
+            "当前没有配置云端模型。我可以检索培养计划原文，但不能判断实时课表、课程容量、"
             "时间冲突、教师安排或教室信息。请以教务系统和学院通知为准。"
         )
     if "2026" in question_text or "2024" in question_text or "2023" in question_text:
@@ -71,9 +76,8 @@ def fallback_answer(question: str, has_results: bool) -> str:
         )
     if any(term in question_text for term in ["推荐", "选哪些课", "选课", "专业", "怎么安排"]):
         return (
-            "当前没有配置云端模型，因此我先展示检索到的培养计划片段。若要生成个性化学业建议，"
-            "请配置 API；建议类问题通常还需要说明年级、招生大类或专业、当前学期、已修课程、"
-            "兴趣方向和学分压力偏好。"
+            "当前没有配置云端模型，因此我先展示检索到的培养计划片段。个性化学业建议通常还需要年级、"
+            "招生大类或专业、当前学期、已修课程、兴趣方向和学分压力偏好。"
         )
     if has_results:
         return "当前没有配置云端模型，因此我先展示检索到的培养计划原文片段，供你核对。"
