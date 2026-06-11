@@ -3,6 +3,11 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+except AttributeError:
+    pass
+
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
@@ -36,6 +41,8 @@ def main() -> int:
         print(f"- {source['id']} {source['file']} p.{source['page']} {source['section']}")
     if "42.5" not in answer:
         raise RuntimeError("Smoke answer did not include the expected 42.5 credit value.")
+    if "差额" in answer or "可能存在" in answer or "未列出" in answer:
+        raise RuntimeError("Smoke answer added unsupported credit-subtotal speculation.")
     return 0
 
 

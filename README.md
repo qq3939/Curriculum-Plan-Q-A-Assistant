@@ -85,6 +85,14 @@ python scripts\eval_fuzzy_intent.py
 
 该脚本会验证“计科大二要修啥”“公共课一共得拿多少分”等模糊问题能被改写为更贴近知识库的检索查询。
 
+课程表结构化抽取检查：
+
+```powershell
+python scripts\eval_course_tables.py
+```
+
+该脚本会验证计算机科学与技术专业大二 `二/1`、`二/2` 课程表能从 PDF 文本中抽取为结构化课程行，并定位到来源页。
+
 ## 自动 Git 版本管理
 
 ```powershell

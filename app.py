@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 
 from planqa.config import load_config
+from planqa.courses import build_course_context
 from planqa.embeddings import make_embedding_provider
 from planqa.intent import enhanced_search
 from planqa.llm import OpenAICompatibleChatClient
@@ -401,7 +402,6 @@ def render_examples() -> None:
                 st.session_state.pending_prompt = prompt
                 st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
-    return selected
 
 
 def answer_question(prompt: str, profile: dict[str, str], index, provider, chat_client) -> None:
@@ -413,7 +413,9 @@ def answer_question(prompt: str, profile: dict[str, str], index, provider, chat_
         with st.spinner("正在查找培养计划依据..."):
             analysis, results = enhanced_search(index, provider, prompt, top_k=8)
             sources = source_payload(results)
-            context = build_context(results)
+            course_context = build_course_context(index, prompt, analysis, results)
+            base_context = build_context(results)
+            context = "\n\n".join(part for part in [course_context, base_context] if part)
             student_context = format_student_context(profile)
 
         if chat_client.available:

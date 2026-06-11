@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
 from planqa.config import load_config
+from planqa.courses import build_course_context
 from planqa.embeddings import make_embedding_provider
 from planqa.intent import enhanced_search
 from planqa.llm import OpenAICompatibleChatClient
@@ -33,7 +34,8 @@ def main() -> int:
     joined_sources = "\n".join(f"{result.chunk.section_title} {result.chunk.text[:400]}" for result in results)
     if "计算机科学与技术" not in joined_sources or "二/1" not in joined_sources or "二/2" not in joined_sources:
         raise RuntimeError("Fuzzy retrieval did not find 计算机科学与技术 second-year course-table rows.")
-    context = build_context(results)
+    course_context = build_course_context(index, question, analysis, results)
+    context = "\n\n".join(part for part in [course_context, build_context(results)] if part)
     messages = build_messages(question, context, chat_history=[], intent_context=analysis)
     answer = OpenAICompatibleChatClient(config).complete(messages)
     print("Question:", question)
@@ -45,6 +47,8 @@ def main() -> int:
         print(f"- {source['id']} {source['file']} p.{source['page']} {source['section']}")
     if "数据结构" not in answer or "二/1" not in answer or "二/2" not in answer:
         raise RuntimeError("Fuzzy answer did not list second-year computer-science courses.")
+    if "理论（3门" in answer or "理论课3门" in answer or "理论3门" in answer:
+        raise RuntimeError("Fuzzy answer miscounted the second-year theory courses.")
     return 0
 
 
