@@ -9,7 +9,7 @@ sys.path.insert(0, str(ROOT / "src"))
 from planqa.config import load_config
 from planqa.embeddings import LocalHashEmbeddingProvider
 from planqa.pdf_index import build_index, is_index_current, load_index
-from planqa.retrieval import search
+from planqa.intent import enhanced_search
 
 
 EXPECTED_PAGES = {
@@ -53,9 +53,10 @@ def main() -> int:
 
     print("Index checks passed.")
     for sample in SAMPLES:
-        results = search(bundle, provider, sample, top_k=3)
+        analysis, results = enhanced_search(bundle, provider, sample, top_k=3)
         assert results, f"No retrieval results for {sample}"
         print(f"\nQ: {sample}")
+        print(f"  intent={analysis.intent} confidence={analysis.confidence:.2f}")
         for result in results:
             chunk = result.chunk
             snippet = " ".join(chunk.text.split())[:120]

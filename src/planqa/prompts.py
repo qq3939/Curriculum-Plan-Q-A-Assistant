@@ -20,18 +20,31 @@ def build_messages(
     user_question: str,
     context: str,
     chat_history: list[dict[str, str]],
+    intent_context: object | None = None,
     max_history_messages: int = 8,
 ) -> list[dict[str, str]]:
     recent_history = chat_history[-max_history_messages:]
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    intent_text = ""
+    if intent_context is not None:
+        try:
+            from .intent import format_intent_context
+
+            intent_text = format_intent_context(intent_context)
+        except Exception:
+            intent_text = ""
+    content_parts = []
+    if intent_text:
+        content_parts.append(intent_text)
+    content_parts.append(
+        "以下是从培养计划 PDF 检索出的资料片段。回答只能依据这些片段；如果要给建议，"
+        "请明确区分资料依据与建议。\n\n"
+        f"{context or '没有检索到相关资料片段。'}"
+    )
     messages.append(
         {
             "role": "user",
-            "content": (
-                "以下是从培养计划 PDF 检索出的资料片段。回答只能依据这些片段；如果要给建议，"
-                "请明确区分资料依据与建议。\n\n"
-                f"{context or '没有检索到相关资料片段。'}"
-            ),
+            "content": "\n\n".join(content_parts),
         }
     )
     for message in recent_history:

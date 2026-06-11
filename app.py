@@ -10,10 +10,11 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from planqa.config import load_config
 from planqa.embeddings import make_embedding_provider
+from planqa.intent import enhanced_search
 from planqa.llm import OpenAICompatibleChatClient
 from planqa.pdf_index import build_index, is_index_current, load_index
 from planqa.prompts import build_messages, fallback_answer
-from planqa.retrieval import build_context, search, source_payload
+from planqa.retrieval import build_context, source_payload
 
 
 @st.cache_resource(show_spinner="正在读取培养计划索引...")
@@ -36,6 +37,27 @@ def render_sources(sources: list[dict[str, object]]) -> None:
                 f"综合分数: {source['score']} | 向量: {source.get('vector_score')} | 关键词: {source.get('lexical_score')}"
             )
             st.text(str(source["text"]))
+
+
+def render_intent(analysis: dict[str, object] | None) -> None:
+    if not analysis:
+        return
+    with st.expander("意图识别"):
+        st.write(f"识别意图: `{analysis.get('intent_label') or analysis.get('intent')}`")
+        st.write(f"置信度: `{analysis.get('confidence')}`")
+        entities = analysis.get("entities") or []
+        if entities:
+            st.write("匹配实体:")
+            for entity in entities:
+                st.write(
+                    f"- {entity.get('kind')}: {entity.get('name')} "
+                    f"(score={entity.get('score')}, by={entity.get('matched_by')})"
+                )
+        queries = analysis.get("search_queries") or []
+        if queries:
+            st.write("检索改写:")
+            for query in queries:
+                st.write(f"- {query}")
 
 
 def main() -> None:
@@ -101,6 +123,7 @@ def main() -> None:
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             if message["role"] == "assistant":
+                render_intent(message.get("intent"))
                 render_sources(message.get("sources", []))
 
     prompt = st.chat_input("请输入你的培养计划或学业规划问题")
@@ -113,7 +136,7 @@ def main() -> None:
 
     with st.chat_message("assistant"):
         with st.spinner("正在查找培养计划依据..."):
-            results = search(index, provider, prompt, top_k=6)
+            analysis, results = enhanced_search(index, provider, prompt, top_k=6)
             sources = source_payload(results)
             context = build_context(results)
 
@@ -123,7 +146,7 @@ def main() -> None:
                 for item in st.session_state.messages
                 if item["role"] in {"user", "assistant"}
             ]
-            messages = build_messages(prompt, context, history)
+            messages = build_messages(prompt, context, history, intent_context=analysis)
             try:
                 answer = chat_client.complete(messages)
             except Exception as exc:
@@ -132,8 +155,11 @@ def main() -> None:
             answer = fallback_answer(prompt, has_results=bool(results))
 
         st.markdown(answer)
+        render_intent(analysis.display_dict())
         render_sources(sources)
-        st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
+        st.session_state.messages.append(
+            {"role": "assistant", "content": answer, "sources": sources, "intent": analysis.display_dict()}
+        )
 
 
 if __name__ == "__main__":

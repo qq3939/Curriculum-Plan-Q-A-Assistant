@@ -23,19 +23,23 @@ def main() -> int:
     else:
         index = load_index(config.index_dir)
 
-    question = "通识教育课程最低要求多少学分？请给出来源。"
-    analysis, results = enhanced_search(index, provider, question, top_k=4)
+    question = "计科大二要修啥，别太官方"
+    analysis, results = enhanced_search(index, provider, question, top_k=5)
+    joined_sources = "\n".join(f"{result.chunk.section_title} {result.chunk.text[:400]}" for result in results)
+    if "计算机科学与技术" not in joined_sources:
+        raise RuntimeError("Fuzzy retrieval did not map 计科 to 计算机科学与技术.")
     context = build_context(results)
     messages = build_messages(question, context, chat_history=[], intent_context=analysis)
     answer = OpenAICompatibleChatClient(config).complete(messages)
     print("Question:", question)
     print(f"Intent: {analysis.intent} confidence={analysis.confidence:.2f}")
-    print("Answer:", answer[:800])
+    print("Queries:", analysis.search_queries[:4])
+    print("Answer:", answer[:900])
     print("Sources:")
     for source in source_payload(results):
         print(f"- {source['id']} {source['file']} p.{source['page']} {source['section']}")
-    if "42.5" not in answer:
-        raise RuntimeError("Smoke answer did not include the expected 42.5 credit value.")
+    if "计算机" not in answer and "课程" not in answer:
+        raise RuntimeError("Fuzzy answer did not look relevant to the intended course-plan question.")
     return 0
 
 

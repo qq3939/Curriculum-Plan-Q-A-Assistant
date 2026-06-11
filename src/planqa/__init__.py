@@ -3,6 +3,7 @@
 __all__ = [
     "config",
     "embeddings",
+    "intent",
     "llm",
     "pdf_index",
     "prompts",
