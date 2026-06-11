@@ -15,7 +15,7 @@ from planqa.pdf_index import build_index, is_index_current, load_index
 FUZZY_CASES = [
     {
         "question": "计科大二要修啥，别太官方",
-        "must_match": ["计算机科学与技术"],
+        "must_match": ["计算机科学与技术", "二/1", "二/2"],
         "expected_intents": {"course_plan", "academic_advice", "major_profile"},
     },
     {

@@ -105,6 +105,11 @@ _FIELD_EXPANSIONS = {
     "毕业需要": ["毕业要求", "学分结构及要求", "总学分"],
     "适合我": ["培养目标", "主干课程", "毕业要求"],
     "有哪些": ["对应专业", "涵盖专业", "课程设置"],
+    "大二": ["二/1", "二/2", "第二学年", "第3学期", "第4学期", "专业基础理论", "专业基础实践"],
+    "第3学期": ["二/1", "第二学年第一学期", "专业基础理论", "专业基础实践"],
+    "第4学期": ["二/2", "第二学年第二学期", "专业基础理论", "专业基础实践"],
+    "第三学期": ["二/1", "第二学年第一学期", "专业基础理论", "专业基础实践"],
+    "第四学期": ["二/2", "第二学年第二学期", "专业基础理论", "专业基础实践"],
 }
 
 
@@ -195,6 +200,11 @@ def _boost_for_analysis(result: SearchResult, analysis: IntentAnalysis, query_we
             boost += entity_boost * entity.score
     if analysis.intent == "course_plan" and "建议修读" in result.chunk.text:
         boost += 0.08
+    if analysis.intent == "course_plan" and _asks_second_year(analysis.normalized_query):
+        if "二/1" in result.chunk.text or "二/2" in result.chunk.text:
+            boost += 0.35
+        if "专业基础理论" in result.chunk.text or "专业基础实践" in result.chunk.text:
+            boost += 0.12
     if analysis.intent == "credit_requirement" and ("学分结构" in result.chunk.text or "最低要求" in result.chunk.text):
         boost += 0.08
     if analysis.intent == "admission_category" and ("对应专业" in result.chunk.section_title or "涵盖专业" in result.chunk.text):
@@ -239,6 +249,8 @@ def _build_search_queries(question: str, normalized: str, entities: list[Matched
 
     if any(term in normalized for term in ["大类", "分流", "包含", "涵盖"]):
         queries.append(f"{question} 2025级本科专业大类与对应专业一览表 招生大类 涵盖专业")
+    if _asks_second_year(normalized):
+        queries.append(f"{question} 二/1 二/2 第二学年 第3学期 第4学期 专业基础理论 专业基础实践 建议修读")
 
     return _dedupe(queries)[:10]
 
@@ -313,6 +325,10 @@ def _guess_kind(name: str) -> str:
 
 def _confidence(score: float, signal_count: int) -> float:
     return min(0.35 + score * 0.16 + signal_count * 0.025, 0.98)
+
+
+def _asks_second_year(normalized_question: str) -> bool:
+    return any(term in normalized_question for term in ["大二", "第3学期", "第4学期", "第三学期", "第四学期", "二/1", "二/2"])
 
 
 def _normalize_question(question: str) -> str:
