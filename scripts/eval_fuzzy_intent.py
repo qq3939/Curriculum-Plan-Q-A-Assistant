@@ -19,6 +19,11 @@ FUZZY_CASES = [
         "expected_intents": {"course_plan", "academic_advice", "major_profile"},
     },
     {
+        "question": "计算机大二会学哪些课程",
+        "must_match": ["计算机科学与技术", "二/1", "二/2"],
+        "expected_intents": {"course_plan"},
+    },
+    {
         "question": "公共课一共得拿多少分",
         "must_match": ["通识教育课程", "42.5"],
         "expected_intents": {"credit_requirement", "course_plan", "general_qa"},

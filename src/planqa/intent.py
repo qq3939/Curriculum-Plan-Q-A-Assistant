@@ -91,6 +91,7 @@ _SYNONYM_MAP = {
 
 _SPECIFIC_ALIAS_MAP = {
     "计算机专业": ["计算机科学与技术"],
+    "计算机大二": ["计算机科学与技术"],
     "计科专业": ["计算机科学与技术"],
     "计科": ["计算机科学与技术"],
     "智能制造类": ["工科试验班", "智能化制造类", "机器人工程", "机械设计制造及其自动化", "自动化"],
@@ -130,6 +131,10 @@ def analyze_intent(index: IndexBundle, question: str) -> IntentAnalysis:
         intent_scores["admission_category"] += sum(0.4 for entity in entities if entity.kind == "招生大类")
         signals.extend([f"{entity.kind}:{entity.name}" for entity in entities[:4]])
 
+    if _asks_second_year(normalized) and _asks_course_arrangement(normalized):
+        intent_scores["course_plan"] += 1.2
+        signals.append("course_plan:second_year_course_arrangement")
+
     intent = max(intent_scores, key=intent_scores.get)
     if intent_scores[intent] <= 0:
         intent = "general_qa"
@@ -168,6 +173,12 @@ def enhanced_search(
     if not merged:
         return analysis, []
     ordered = sorted(merged.values(), key=lambda item: item.score, reverse=True)
+    if analysis.intent == "course_plan" and _asks_second_year(analysis.normalized_query):
+        scoped = _scope_to_matched_majors(ordered, analysis)
+        if scoped:
+            ordered = scoped
+        major_count = sum(1 for entity in analysis.entities if entity.kind == "专业")
+        top_k = max(top_k, min(12, major_count * 2))
     return analysis, ordered[:top_k]
 
 
@@ -238,7 +249,8 @@ def _build_search_queries(question: str, normalized: str, entities: list[Matched
     if deduped_expansions:
         queries.append(f"{question} {' '.join(deduped_expansions[:8])}")
 
-    for entity in entities[:3]:
+    entity_query_limit = 6 if _asks_second_year(normalized) else 3
+    for entity in entities[:entity_query_limit]:
         queries.append(f"{entity.name} {question}")
         if any(term in normalized for term in ["学什么", "课程", "选课", "这学期", "要修"]):
             queries.append(f"{entity.name} 课程设置 建议修读 学年学期")
@@ -329,6 +341,22 @@ def _confidence(score: float, signal_count: int) -> float:
 
 def _asks_second_year(normalized_question: str) -> bool:
     return any(term in normalized_question for term in ["大二", "第3学期", "第4学期", "第三学期", "第四学期", "二/1", "二/2"])
+
+
+def _asks_course_arrangement(normalized_question: str) -> bool:
+    return any(term in normalized_question for term in ["课程", "选课", "修", "学哪些", "会学", "要学", "学什么", "安排"])
+
+
+def _scope_to_matched_majors(results: list[SearchResult], analysis: IntentAnalysis) -> list[SearchResult]:
+    major_names = [_compact(entity.name) for entity in analysis.entities if entity.kind == "专业"]
+    if not major_names:
+        return results
+    scoped: list[SearchResult] = []
+    for result in results:
+        target = _compact(" ".join([result.chunk.source_file, result.chunk.section_title, result.chunk.text[:500]]))
+        if any(name in target for name in major_names):
+            scoped.append(result)
+    return scoped
 
 
 def _normalize_question(question: str) -> str:

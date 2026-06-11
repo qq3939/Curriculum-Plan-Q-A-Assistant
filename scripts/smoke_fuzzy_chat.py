@@ -28,11 +28,11 @@ def main() -> int:
     else:
         index = load_index(config.index_dir)
 
-    question = "计科大二要修啥，别太官方"
+    question = "计算机大二会学哪些课程"
     analysis, results = enhanced_search(index, provider, question, top_k=5)
     joined_sources = "\n".join(f"{result.chunk.section_title} {result.chunk.text[:400]}" for result in results)
-    if "计算机科学与技术" not in joined_sources:
-        raise RuntimeError("Fuzzy retrieval did not map 计科 to 计算机科学与技术.")
+    if "计算机科学与技术" not in joined_sources or "二/1" not in joined_sources or "二/2" not in joined_sources:
+        raise RuntimeError("Fuzzy retrieval did not find 计算机科学与技术 second-year course-table rows.")
     context = build_context(results)
     messages = build_messages(question, context, chat_history=[], intent_context=analysis)
     answer = OpenAICompatibleChatClient(config).complete(messages)
@@ -43,8 +43,8 @@ def main() -> int:
     print("Sources:")
     for source in source_payload(results):
         print(f"- {source['id']} {source['file']} p.{source['page']} {source['section']}")
-    if "计算机" not in answer and "课程" not in answer:
-        raise RuntimeError("Fuzzy answer did not look relevant to the intended course-plan question.")
+    if "数据结构" not in answer or "二/1" not in answer or "二/2" not in answer:
+        raise RuntimeError("Fuzzy answer did not list second-year computer-science courses.")
     return 0
 
 
