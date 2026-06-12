@@ -61,6 +61,19 @@ def main() -> int:
     assert "二/1" in context and "二/2" in context
     assert "p.159" in context and "p.160" in context
 
+    broad_question = "每个专业大二（第3、4学期）的完整课程清单是什么？"
+    broad_analysis, broad_results = enhanced_search(index, provider, broad_question, top_k=8)
+    broad_context = build_course_context(index, broad_question, broad_analysis, broad_results)
+    assert "结构化课程范围提示" in broad_context
+    assert "不要回答“培养计划没有标注每门课程的建议修读学期”" in broad_context
+
+    category_question = "电子与信息类每个专业大二课程清单"
+    category_analysis, category_results = enhanced_search(index, provider, category_question, top_k=8)
+    category_context = build_course_context(index, category_question, category_analysis, category_results)
+    assert "识别到招生大类：工科试验班(电子与信息类)" in category_context
+    assert "计算机科学与技术" in category_context
+    assert "电子信息科学与技术(中英合作)" not in category_context
+
     print("Course table extraction checks passed.")
     print(f"计算机科学与技术大二课程数: {len(records)}")
     for record in records:

@@ -4,6 +4,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass
 
+from .categories import get_admission_categories
 from .intent import IntentAnalysis
 from .pdf_index import IndexBundle, PdfChunk
 from .retrieval import SearchResult
@@ -34,24 +35,40 @@ def build_course_context(
         return ""
 
     majors = _target_majors(analysis)
+    category_name, category_majors = _target_category(index, question, analysis)
+    if not majors and category_majors:
+        majors = category_majors
     term_prefixes = _target_term_prefixes(question)
     if not majors and not term_prefixes:
         return ""
 
-    source_pages = {(result.chunk.source_file, result.chunk.page) for result in results}
+    if term_prefixes and not majors:
+        return _broad_scope_context(index, term_prefixes)
+
     records = find_course_records(index, majors=majors, term_prefixes=term_prefixes)
-    if source_pages:
+    source_pages = {(result.chunk.source_file, result.chunk.page) for result in results}
+    if source_pages and not majors:
         scoped = [record for record in records if (record.source_file, record.page) in source_pages]
         if scoped:
             records = scoped
     if not records:
         return ""
 
+    total_records = len(records)
+    total_majors = len({record.major for record in records})
     records = records[:max_records]
     lines = [
         "结构化课程表辅助信息：",
         "以下课程行由培养计划课程表文本抽取，用于减少漏课；引用仍以检索来源 [S] 和页面原文为准。",
     ]
+    if category_name:
+        lines.append(f"识别到招生大类：{category_name}；以下仅使用该大类涵盖专业的课程表。")
+        lines.append("该大类目标专业：" + "、".join(majors))
+    if total_records > max_records:
+        lines.append(
+            f"注意：匹配范围共 {total_majors} 个专业、{total_records} 条课程行；"
+            f"当前上下文只放入前 {max_records} 条。回答时不要声称这是完整清单，应建议用户缩小到某个专业或分批查看。"
+        )
     summaries = _term_summaries(records)
     current_key: tuple[str, str] | None = None
     for record in records:
@@ -189,6 +206,27 @@ def _target_majors(analysis: IntentAnalysis) -> list[str]:
     return majors
 
 
+def _target_category(index: IndexBundle, question: str, analysis: IntentAnalysis) -> tuple[str, list[str]]:
+    compact_question = _compact_major(question)
+    entity_names = {_compact_major(entity.name) for entity in analysis.entities if entity.kind == "招生大类"}
+    best_name = ""
+    best_majors: list[str] = []
+    best_score = 0
+    for category in get_admission_categories(index):
+        score = 0
+        for alias in category.aliases:
+            compact_alias = _compact_major(alias)
+            if compact_alias and compact_alias in compact_question:
+                score = max(score, len(compact_alias))
+            if compact_alias in entity_names:
+                score = max(score, len(compact_alias) + 4)
+        if score > best_score:
+            best_name = category.name
+            best_majors = list(category.majors)
+            best_score = score
+    return best_name, best_majors
+
+
 def _target_term_prefixes(question: str) -> list[str]:
     compact = re.sub(r"\s+", "", question)
     prefixes: list[str] = []
@@ -303,6 +341,23 @@ def _format_credits(value: float) -> str:
     if value.is_integer():
         return str(int(value))
     return f"{value:.1f}".rstrip("0").rstrip(".")
+
+
+def _broad_scope_context(index: IndexBundle, term_prefixes: list[str]) -> str:
+    records = find_course_records(index, term_prefixes=term_prefixes)
+    if not records:
+        return ""
+    majors = sorted({record.major for record in records})
+    term_label = "、".join(term_prefixes)
+    return "\n".join(
+        [
+            "结构化课程范围提示：",
+            f"培养计划的各专业课程表中有“建议修读学年学期”列；{term_label} 对应大二相关学期。",
+            f"系统已能从 PDF 课程表抽取到 {len(majors)} 个专业、{len(records)} 条 {term_label} 课程行。",
+            "当前问题没有识别到具体专业或招生大类，范围过大；不要回答“培养计划没有标注每门课程的建议修读学期”。",
+            "应先说明资料里有明确学期标注，再请用户指定专业或招生大类，或说明可以按专业/大类分批列出。",
+        ]
+    )
 
 
 def _compact_major(value: str) -> str:

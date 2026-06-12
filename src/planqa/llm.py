@@ -15,7 +15,7 @@ class OpenAICompatibleChatClient:
     def available(self) -> bool:
         return self.config.has_chat_config
 
-    def complete(self, messages: list[dict[str, str]], temperature: float = 0.2) -> str:
+    def complete(self, messages: list[dict[str, str]], temperature: float = 0.0) -> str:
         if not self.available:
             raise RuntimeError("Chat API is not configured.")
         url = f"{self.config.base_url}/chat/completions"

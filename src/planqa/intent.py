@@ -94,8 +94,8 @@ _SPECIFIC_ALIAS_MAP = {
     "计算机大二": ["计算机科学与技术"],
     "计科专业": ["计算机科学与技术"],
     "计科": ["计算机科学与技术"],
-    "智能制造类": ["工科试验班", "智能化制造类", "机器人工程", "机械设计制造及其自动化", "自动化"],
-    "智能化制造类": ["工科试验班", "智能化制造类", "机器人工程", "机械设计制造及其自动化", "自动化"],
+    "智能制造类": ["工科试验班(智能化制造类)", "智能化制造类", "机器人工程", "机械设计制造及其自动化", "工业设计"],
+    "智能化制造类": ["工科试验班(智能化制造类)", "智能化制造类", "机器人工程", "机械设计制造及其自动化", "工业设计"],
 }
 
 
@@ -322,7 +322,17 @@ def _entity_candidates(index: IndexBundle) -> list[tuple[str, str]]:
         if "专业大类与对应专业" in section:
             candidates.add(("招生大类", "2025级本科专业大类与对应专业一览表"))
 
-    for keyword in ["工科试验班", "智能化制造类", "电子信息类", "经管类", "新闻传播学类", "设计学类"]:
+    for keyword in [
+        "工科试验班",
+        "工科试验班(智能化制造类)",
+        "工科试验班(电子与信息类)",
+        "智能化制造类",
+        "电子与信息类",
+        "电子信息类",
+        "经管类",
+        "新闻传播学类",
+        "设计学类",
+    ]:
         candidates.add(("招生大类", keyword))
     return sorted(candidates, key=lambda item: item[1])
 
@@ -330,7 +340,7 @@ def _entity_candidates(index: IndexBundle) -> list[tuple[str, str]]:
 def _guess_kind(name: str) -> str:
     if "课程" in name:
         return "课程模块"
-    if "类" in name or "大类" in name:
+    if "类" in name or "大类" in name or "试验班" in name:
         return "招生大类"
     return "专业"
 

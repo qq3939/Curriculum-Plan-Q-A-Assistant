@@ -93,6 +93,38 @@ python scripts\eval_course_tables.py
 
 该脚本会验证计算机科学与技术专业大二 `二/1`、`二/2` 课程表能从 PDF 文本中抽取为结构化课程行，并定位到来源页。
 
+招生大类结构化抽取检查：
+
+```powershell
+python scripts\eval_admission_categories.py
+```
+
+该脚本会验证专业大类表可被抽取为“招生大类 -> 涵盖专业”，并检查智能化制造类推荐不会越过本大类。
+
+课程范围问答 smoke：
+
+```powershell
+python scripts\smoke_course_scope.py
+```
+
+该脚本会调用模型验证“每个专业大二课程”这类范围过大的问题不会被误答成“培养计划没有标注学期”。
+
+推荐类问答 smoke：
+
+```powershell
+python scripts\smoke_advice.py
+```
+
+该脚本会调用模型验证“智能化制造类 + 喜欢计算机和机器人”的回答能优先推荐本大类内的机器人工程。
+
+核心 30 题真实模型验收：
+
+```powershell
+python scripts\eval_model_acceptance.py
+```
+
+该脚本会以 `temperature=0` 调用当前配置的聊天模型，覆盖单点事实、课程安排、招生大类、推荐建议、边界拒答和连续追问。验收会检查引用缺失、错学分/错课程、越大类推荐、实时信息误答和资料外推断；结果写入 `data/model_acceptance_latest.json`。
+
 ## 自动 Git 版本管理
 
 ```powershell
